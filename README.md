@@ -1,5 +1,4 @@
-# wh1000-connect
-Dealing with the annoying BT tantrums on Oracle Linux
+# wh1000-connect - dealing with the BT connection issues.
 
 On my Oracle Linux machine, connecting to the Sony wh1000 headset via the settings UI is annoying, sometimes it enters the low quality headset mode, sometimes it plainly doesn't connect. Also, there appear to be two volume controls for the WH, one is remembered on the headset, Windows, Android and Fedora machines that I have set this volume when moving the volume sliders, Oracle Linux doesn't. So I have to tap it out on the physical touch controls, lame-o...
 Instead of fixing the issue properly, I applied some duct tape:
