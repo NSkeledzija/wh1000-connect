@@ -12,7 +12,11 @@ It works on my machine! (i.e. I didn't test it anywhere else and it's probably b
 
 Usage:
 
-Download the file, store it somewhere, perhaps in your home dir, I use an alias for running it, put something like this in your .bashrc:
+Download the file, store it somewhere, perhaps in your home dir, add execute permissions:
+
+`chmod +x ~/wh1000-connect/wh1000-connect.sh`
+
+I use an alias for running it, put something like this in your .bashrc:
 
 `alias whc='~/wh1000-connect/wh1000-connect.sh 2D:E6:B0:De:7F:96'`
 
