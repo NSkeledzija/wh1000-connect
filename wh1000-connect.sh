@@ -6,6 +6,7 @@ if [ -z "$MAC" ]; then
     echo "No MAC address provided. Usage: ./wh1000-connect <MAC_address>"
     exit 1
 fi
+
 VOLUME=100
 MAC_UNDERSCORES=$(echo $MAC | tr  ":" _ )
 
@@ -82,16 +83,13 @@ function connected_as_a2dp_sink {
 }
 
 function set_a2dp_sink {
-    # Get the card index for the Bluetooth device with the given MAC address
     CARD_INDEX=$(pactl list cards short | grep "$MAC_UNDERSCORES" | cut -f1)
 
-    # Check if the card index was found
     if [ -z "$CARD_INDEX" ]; then
         echo "Could not find card index for Bluetooth device with MAC address $MAC_UNDERSCORES."
         return 1
     fi
 
-    # Set the card profile to a2dp_sink
     echo "Setting card profile for Bluetooth device with MAC address $MAC_UNDERSCORES to a2dp_sink..."
     pactl set-card-profile "$CARD_INDEX" a2dp_sink
 }
@@ -100,7 +98,6 @@ if headset_connected && ! connected_as_a2dp_sink; then
 	set_a2dp_sink
 fi
 
-# Check if the device is connected
 while ! headset_connected ; do
     connect_headset
     sleep 2
