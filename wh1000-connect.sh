@@ -72,20 +72,39 @@ function get_device_path {
     done
 }
 
-# We disconnect the headset first when running this script. Reasoning behind this is that sometimes
-# when starting my laptop, it connects to WH1000 in headset mode, disconnecting it here and connecting again fixes it.
-while headset_connected ; do
-    disconnect_headset
-    sleep 2
-done
+function connected_as_a2dp_sink {
+    SINK_DESCRIPTION=$(pactl list sinks | grep -P -A1 ".*$MAC_UNDERSCORES.*" | grep -oP "(?<=Description: ).*")
+    
+    if [[ "$SINK_DESCRIPTION" == *"a2dp_sink"* ]]; then
+        return 0
+    fi
+    return 1
+}
+
+function set_a2dp_sink {
+    # Get the card index for the Bluetooth device with the given MAC address
+    CARD_INDEX=$(pactl list cards short | grep "$MAC_UNDERSCORES" | cut -f1)
+
+    # Check if the card index was found
+    if [ -z "$CARD_INDEX" ]; then
+        echo "Could not find card index for Bluetooth device with MAC address $MAC_UNDERSCORES."
+        return 1
+    fi
+
+    # Set the card profile to a2dp_sink
+    echo "Setting card profile for Bluetooth device with MAC address $MAC_UNDERSCORES to a2dp_sink..."
+    pactl set-card-profile "$CARD_INDEX" a2dp_sink
+}
+
+if headset_connected && ! connected_as_a2dp_sink; then
+	set_a2dp_sink
+fi
 
 # Check if the device is connected
 while ! headset_connected ; do
     connect_headset
     sleep 2
 done
-
-echo "Headset connected!"
 
 get_device_path
 set_volume
