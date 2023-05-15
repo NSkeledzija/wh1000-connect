@@ -19,9 +19,30 @@ function connect_headset {
     echo "Done!"
 }
 
+function disconnect_headset {
+    echo "Disconnecting from headset..."
+    echo -e "disconnect $MAC \nquit" | bluetoothctl
+    echo "Done!"
+}
+
 function set_volume {
-    echo "Setting HW volume to ${VOLUME}..."
-    dbus-send --system --print-reply --dest=org.bluez "${DEVICE_PATH}" org.freedesktop.DBus.Properties.Set string:"org.bluez.MediaTransport1" string:"Volume" variant:uint16:"${VOLUME}";
+    local retries=5
+
+    for ((i=0; i<retries; i++)); do
+        echo "Setting HW volume to ${VOLUME} on device path: ${DEVICE_PATH}"
+        dbus-send --system --print-reply --dest=org.bluez "${DEVICE_PATH}" org.freedesktop.DBus.Properties.Set string:"org.bluez.MediaTransport1" string:"Volume" variant:uint16:"${VOLUME}";
+
+        if [ $? -eq 0 ]; then
+            echo "Volume set successfully!"
+            return 0
+        else
+            echo "Failed to set volume. Retry $((i+1))/$retries..."
+            sleep 2
+        fi
+    done
+
+    echo "Failed to set volume after $retries attempts. Please check the connection and try again."
+    exit 1
 }
 
 function set_audio_sink {
@@ -36,7 +57,8 @@ function set_audio_sink {
 }
 
 function get_device_path {
-    DEVICE_PATH=$(dbus-send --system --dest=org.bluez --print-reply / org.freedesktop.DBus.ObjectManager.GetManagedObjects | grep -P "/org/bluez/hci0/dev_${MAC_UNDERSCORES}/sep\d/fd\d" | cut -d '"' -f2)
+	BLUEZ_REGEX="/org/bluez/hci0/dev_${MAC_UNDERSCORES}/sep\d+/fd\d+"
+    DEVICE_PATH=$(dbus-send --system --dest=org.bluez --print-reply / org.freedesktop.DBus.ObjectManager.GetManagedObjects | grep -P "${BLUEZ_REGEX}" | cut -d '"' -f2)
     while [ -z "${DEVICE_PATH}" ]; do
         echo "Couldn't find dbus object, wait and retry..."
         sleep 2
@@ -46,9 +68,16 @@ function get_device_path {
             exit 1
         fi
 
-        DEVICE_PATH=$(dbus-send --system --dest=org.bluez --print-reply / org.freedesktop.DBus.ObjectManager.GetManagedObjects | grep -P "/org/bluez/hci0/dev_${MAC_UNDERSCORES}/sep\d/fd\d" | cut -d '"' -f2)
+        DEVICE_PATH=$(dbus-send --system --dest=org.bluez --print-reply / org.freedesktop.DBus.ObjectManager.GetManagedObjects | grep -P "${BLUEZ_REGEX}" | cut -d '"' -f2)
     done
 }
+
+# We disconnect the headset first when running this script. Reasoning behind this is that sometimes
+# when starting my laptop, it connects to WH1000 in headset mode, disconnecting it here and connecting again fixes it.
+while headset_connected ; do
+    disconnect_headset
+    sleep 2
+done
 
 # Check if the device is connected
 while ! headset_connected ; do
