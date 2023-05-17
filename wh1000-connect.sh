@@ -10,12 +10,26 @@ fi
 VOLUME=100
 MAC_UNDERSCORES=$(echo $MAC | tr  ":" _ )
 
+function restart_pulse {
+    echo "Restarting pulse audio..."
+    pulseaudio -k
+    pulseaudio --start
+    sleep 5
+}
+
+function restart_bluetooth {
+    echo "Restarting bluetooth service..."
+    sudo systemctl stop bluetooth
+    sudo systemctl start bluetooth
+    sleep 5
+}
+
 function headset_connected {
     hcitool con | grep -P -q "$MAC.*state 1";
 }
 
 function connect_headset {
-    echo "Headset not connected! Running bluetoothctl to connect..."
+    echo "Running bluetoothctl connect..."
     echo -e "connect $MAC \nquit" | bluetoothctl
     echo "Done!"
 }
@@ -58,8 +72,9 @@ function set_audio_sink {
 }
 
 function get_device_path {
-	BLUEZ_REGEX="/org/bluez/hci0/dev_${MAC_UNDERSCORES}/sep\d+/fd\d+"
+    BLUEZ_REGEX="/org/bluez/hci0/dev_${MAC_UNDERSCORES}/sep\d+/fd\d+"
     DEVICE_PATH=$(dbus-send --system --dest=org.bluez --print-reply / org.freedesktop.DBus.ObjectManager.GetManagedObjects | grep -P "${BLUEZ_REGEX}" | cut -d '"' -f2)
+    local retries=5;
     while [ -z "${DEVICE_PATH}" ]; do
         echo "Couldn't find dbus object, wait and retry..."
         sleep 2
@@ -70,6 +85,11 @@ function get_device_path {
         fi
 
         DEVICE_PATH=$(dbus-send --system --dest=org.bluez --print-reply / org.freedesktop.DBus.ObjectManager.GetManagedObjects | grep -P "${BLUEZ_REGEX}" | cut -d '"' -f2)
+        retries=$((retries-1))
+        if [ $retries -eq 0 ]; then
+            return 1
+        fi
+
     done
 }
 
@@ -90,21 +110,78 @@ function set_a2dp_sink {
         return 1
     fi
 
-    echo "Setting card profile for Bluetooth device with MAC address $MAC_UNDERSCORES to a2dp_sink..."
+    echo "Setting card profile for Bluetooth device with MAC address $MAC_UNDERSCORES, card index $CARD_INDEX to a2dp_sink..."
     pactl set-card-profile "$CARD_INDEX" a2dp_sink
 }
 
-if headset_connected && ! connected_as_a2dp_sink; then
-	set_a2dp_sink
+function connect_and_set_up_wh1000 {
+    if headset_connected && ! connected_as_a2dp_sink; then
+        if ! set_a2dp_sink; then
+            echo "Failed to set A2DP sink!"
+            return 1
+        fi
+    fi
+
+    local retries=5
+    for ((i=0; i<retries; i++)); do
+        connect_headset
+        sleep 2
+        if headset_connected; then
+            break
+        fi
+    done
+
+    if ! headset_connected ; then
+        echo "Failed to connect to headset!"
+        return 1
+    fi
+
+    if ! get_device_path; then
+        echo "Failed to get device path!"
+        return 1
+    fi
+
+    if ! set_volume; then
+        echo "Failed to set volume!"
+        return 1
+    fi
+
+    if ! set_audio_sink; then
+        echo "Failed to set audio sink!"
+        return 1
+    fi
+}
+
+if ! connect_and_set_up_wh1000; then
+    retries=5
+
+    for ((i=0; i<retries; i++)); do
+        echo "Attempt $((i+1))/$retries..."
+
+        echo "Trying to recover..."
+
+        if headset_connected; then
+            echo "Disconnecting headset..."
+            disconnect_headset
+        fi
+
+        restart_pulse
+
+        if connect_and_set_up_wh1000; then
+            echo "Connected successfully!"
+            exit 0
+        fi
+    done
+
+    echo "Restarting bluetooth..."
+    restart_bluetooth
+    sleep 5
+    if connect_and_set_up_wh1000; then
+        echo "Connected successfully!"
+        exit 0
+    fi
+    echo "Failed to connect after $retries attempts. Please check the connection and try again."
+    exit 1
 fi
-
-while ! headset_connected ; do
-    connect_headset
-    sleep 2
-done
-
-get_device_path
-set_volume
-set_audio_sink
 
 exit 0
