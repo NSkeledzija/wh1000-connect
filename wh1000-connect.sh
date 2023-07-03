@@ -7,21 +7,23 @@ if [ -z "$MAC" ]; then
     exit 1
 fi
 
-VOLUME=100
+VOLUME=127
 MAC_UNDERSCORES=$(echo $MAC | tr  ":" _ )
 
 function restart_pulse {
     echo "Restarting pulse audio..."
     pulseaudio -k
+    sleep 2
     pulseaudio --start
-    sleep 5
+    sleep 2
 }
 
 function restart_bluetooth {
     echo "Restarting bluetooth service..."
     sudo systemctl stop bluetooth
+    sleep 2
     sudo systemctl start bluetooth
-    sleep 5
+    sleep 2
 }
 
 function headset_connected {
@@ -57,18 +59,17 @@ function set_volume {
     done
 
     echo "Failed to set volume after $retries attempts. Please check the connection and try again."
-    exit 1
+    return 1
 }
 
 function set_audio_sink {
     SINK=$(pactl list sinks | grep -P ".*$MAC_UNDERSCORES.*"  | grep -oP "(?<=Name: ).*")
     if [[ -z $SINK ]]; then
         echo "Headset $MAC not found in pulse audio, check connection!"
-        exit 1
-    else
-        echo "Setting default audio sink to $SINK"
-        pactl set-default-sink "$SINK"
+        return 1
     fi
+    echo "Setting default audio sink to $SINK"
+    pactl set-default-sink "$SINK"
 }
 
 function get_device_path {
@@ -115,24 +116,24 @@ function set_a2dp_sink {
 }
 
 function connect_and_set_up_wh1000 {
-    if headset_connected && ! connected_as_a2dp_sink; then
-        if ! set_a2dp_sink; then
-            echo "Failed to set A2DP sink!"
-            return 1
-        fi
+    if ! headset_connected; then
+        local retries=5
+	for ((i=0; i<retries; i++)); do
+	    connect_headset
+            sleep 2
+	    if headset_connected; then
+	        break
+            fi
+        done
     fi
-
-    local retries=5
-    for ((i=0; i<retries; i++)); do
-        connect_headset
-        sleep 2
-        if headset_connected; then
-            break
-        fi
-    done
 
     if ! headset_connected ; then
         echo "Failed to connect to headset!"
+        return 1
+    fi
+
+    if ! connected_as_a2dp_sink && ! set_audio_sink; then
+        echo "Failed to set audio sink!"
         return 1
     fi
 
@@ -143,11 +144,6 @@ function connect_and_set_up_wh1000 {
 
     if ! set_volume; then
         echo "Failed to set volume!"
-        return 1
-    fi
-
-    if ! set_audio_sink; then
-        echo "Failed to set audio sink!"
         return 1
     fi
 }

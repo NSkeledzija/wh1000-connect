@@ -6,7 +6,7 @@ Instead of fixing the issue properly, I applied some duct tape:
 2) If connected, checks whether it's in a2dp mode
 3) Switches to a2dp mode if needed.
 4) Gets the proper DBUS object for volume settings.
-5) Sets the volume to 100, this is not the max, seems like it's 127, however, I read it's possible to set it too high and get some distortion, yuck, don't wanna deal with that. 100 is fine, it's fine!
+5) Sets the volume to 127, this is the max. I've read that this can lead to some distortion on some devices, but it works for me.
 6) Use pulse audio to detect the output sink for our mac address and then set this sink to be the default one.
 
 Classic disclaimer:
