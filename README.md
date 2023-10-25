@@ -10,7 +10,7 @@ Instead of fixing the issue properly, I applied some duct tape:
 6) Use pulse audio to detect the output sink for our mac address and then set this sink to be the default one.
 
 Classic disclaimer:
-It works on my machine! (i.e. I didn't test it anywhere else and it's probably broken AF)
+It works on my machine! (i.e. I didn't test it anywhere else)
 
 Usage:
 
